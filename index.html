@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>ESP32 & FX3U Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <style>
+    html { font-family: Arial, sans-serif; display: inline-block; text-align: center; background-color: #f0f2f5; }
+    h2 { font-size: 2.0rem; color: #1a73e8; }
+    p { font-size: 1.2rem; }
+    body { margin: 0; }
+    .topnav { overflow: hidden; background-color: #2f4468; color: white; padding: 15px; }
+    .card { background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 30px; margin: 20px auto; max-width: 400px; border-radius: 15px; }
+    .button { padding: 15px 40px; font-size: 20px; color: #fff; background-color: #008cba; border: none; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+    .button:hover { background-color: #005f7a; }
+    .state { font-size: 1.5rem; font-weight: bold; color: #ff5722; }
+    .status-ok { color: #4caf50; }
+  </style>
+</head>
+<body>
+  <div class="topnav">
+    <h3>Muzaffer Otomasyon Dashboard</h3>
+  </div>
+  <div class="content">
+    <div class="card">
+      <h2>Sistem Kontrolü</h2>
+      <p>Durum: <span id="state" class="state">Bağlanıyor...</span></p>
+      <p><button id="button" class="button">TETİKLE</button></p>
+      <p style="font-size: 0.8rem; color: #666;">Cihaz IP: <span id="device-ip">192.168.1.100</span></p>
+    </div>
+  </div>
+
+<script>
+  // DİKKAT: ESP32'nin IP adresi 192.168.1.100 değilse burayı güncelle!
+  var gateway = "ws://192.168.1.100/ws"; 
+  var websocket;
+
+  window.addEventListener('load', onLoad);
+
+  function initWebSocket() {
+    console.log('WebSocket bağlantısı deneniyor: ' + gateway);
+    websocket = new WebSocket(gateway);
+    websocket.onopen    = onOpen;
+    websocket.onclose   = onClose;
+    websocket.onmessage = onMessage;
+    websocket.onerror   = onError;
+  }
+
+  function onOpen(event) {
+    console.log('Bağlantı başarılı!');
+    document.getElementById('state').innerHTML = "BAĞLANDI";
+    document.getElementById('state').className = "state status-ok";
+  }
+
+  function onClose(event) {
+    console.log('Bağlantı kesildi, tekrar deneniyor...');
+    document.getElementById('state').innerHTML = "Bağlantı Koptu";
+    document.getElementById('state').className = "state";
+    setTimeout(initWebSocket, 2000);
+  }
+
+  function onError(event) {
+    console.error('WebSocket Hatası:', event);
+  }
+
+  function onMessage(event) {
+    var state;
+    if (event.data == "1"){ state = "AÇIK"; }
+    else if (event.data == "0"){ state = "KAPALI"; }
+    else { state = event.data; }
+    document.getElementById('state').innerHTML = state;
+  }
+
+  function onLoad(event) {
+    initWebSocket();
+    document.getElementById('button').addEventListener('click', toggle);
+  }
+
+  function toggle(){
+    if(websocket.readyState === WebSocket.OPEN) {
+      websocket.send('toggle');
+      console.log('Tetikleme gönderildi');
+    } else {
+      alert('Bağlantı henüz hazır değil!');
+    }
+  }
+</script>
+</body>
+</html>
