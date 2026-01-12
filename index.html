@@ -26,19 +26,19 @@
       <h2>Sistem Kontrolü</h2>
       <p>Durum: <span id="state" class="state">Bağlanıyor...</span></p>
       <p><button id="button" class="button">TETİKLE</button></p>
-      <p style="font-size: 0.8rem; color: #666;">Cihaz IP: <span id="device-ip">192.168.1.100</span></p>
+      <p style="font-size: 0.8rem; color: #666;">Cihaz IP: 192.168.0.150</p>
     </div>
   </div>
 
 <script>
-  // DİKKAT: ESP32'nin IP adresi 192.168.1.100 değilse burayı güncelle!
-  var gateway = "ws://192.168.1.100/ws"; 
+  // IP ADRESİN GÜNCELLENDİ
+  var gateway = "ws://192.168.0.150/ws"; 
   var websocket;
 
   window.addEventListener('load', onLoad);
 
   function initWebSocket() {
-    console.log('WebSocket bağlantısı deneniyor: ' + gateway);
+    console.log('Bağlantı deneniyor: ' + gateway);
     websocket = new WebSocket(gateway);
     websocket.onopen    = onOpen;
     websocket.onclose   = onClose;
@@ -60,7 +60,7 @@
   }
 
   function onError(event) {
-    console.error('WebSocket Hatası:', event);
+    console.error('WebSocket Hatası (Muhtemelen HTTPS engeli):', event);
   }
 
   function onMessage(event) {
@@ -77,11 +77,10 @@
   }
 
   function toggle(){
-    if(websocket.readyState === WebSocket.OPEN) {
+    if(websocket && websocket.readyState === WebSocket.OPEN) {
       websocket.send('toggle');
-      console.log('Tetikleme gönderildi');
     } else {
-      alert('Bağlantı henüz hazır değil!');
+      alert('Hata: ESP32 ile bağlantı yok! Tarayıcı ayarlarından "Güvensiz İçeriğe" izin verin.');
     }
   }
 </script>
