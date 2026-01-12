@@ -1,88 +1,360 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html lang="tr">
 <head>
-  <title>ESP32 & FX3U Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta charset="UTF-8">
-  <style>
-    html { font-family: Arial, sans-serif; display: inline-block; text-align: center; background-color: #f0f2f5; }
-    h2 { font-size: 2.0rem; color: #1a73e8; }
-    p { font-size: 1.2rem; }
-    body { margin: 0; }
-    .topnav { overflow: hidden; background-color: #2f4468; color: white; padding: 15px; }
-    .card { background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 30px; margin: 20px auto; max-width: 400px; border-radius: 15px; }
-    .button { padding: 15px 40px; font-size: 20px; color: #fff; background-color: #008cba; border: none; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-    .button:hover { background-color: #005f7a; }
-    .state { font-size: 1.5rem; font-weight: bold; color: #ff5722; }
-    .status-ok { color: #4caf50; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muzaffer Otomasyon Kontrol Paneli</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='50%' x='50%' text-anchor='middle' dominant-baseline='middle' font-size='60'>🔧</text></svg>">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .status-led {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .status-led.green { background-color: #28a745; }
+        .status-led.red { background-color: #dc3545; }
+        .status-led.gray { background-color: #6c757d; }
+        .gauge-container {
+            text-align: center;
+            padding: 20px;
+        }
+        .gauge-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .control-btn {
+            margin: 5px;
+            min-width: 120px;
+        }
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body>
-  <div class="topnav">
-    <h3>Muzaffer Otomasyon Dashboard</h3>
-  </div>
-  <div class="content">
-    <div class="card">
-      <h2>Sistem Kontrolü</h2>
-      <p>Durum: <span id="state" class="state">Bağlanıyor...</span></p>
-      <p><button id="button" class="button">TETİKLE</button></p>
-      <p style="font-size: 0.8rem; color: #666;">Cihaz IP: 192.168.0.150</p>
+    <div class="connection-status">
+        <span class="badge bg-danger" id="connectionStatus">Bağlantı Yok</span>
     </div>
-  </div>
 
-<script>
-  // IP ADRESİN GÜNCELLENDİ
-  var gateway = "ws://192.168.0.150/ws"; 
-  var websocket;
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">Muzaffer Otomasyon Kontrol Paneli</h1>
+            </div>
+        </div>
 
-  window.addEventListener('load', onLoad);
+        <!-- Bağlantı Durumu -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <strong>MQTT Broker:</strong> broker.hivemq.com:1883 | 
+                    <strong>Durum:</strong> <span id="mqttStatus">Bağlanıyor...</span>
+                    <button class="btn btn-sm btn-secondary float-end" onclick="showConnectionInfo()">
+                        Bağlantı Bilgileri
+                    </button>
+                </div>
+            </div>
+        </div>
 
-  function initWebSocket() {
-    console.log('Bağlantı deneniyor: ' + gateway);
-    websocket = new WebSocket(gateway);
-    websocket.onopen    = onOpen;
-    websocket.onclose   = onClose;
-    websocket.onmessage = onMessage;
-    websocket.onerror   = onError;
-  }
+        <!-- D220 Akım Değeri -->
+        <div class="row mb-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>D220 Akım Değeri</h5>
+                    </div>
+                    <div class="card-body gauge-container">
+                        <div class="gauge-value" id="d220Value">--- mA</div>
+                        <div class="progress mt-3">
+                            <div class="progress-bar" id="d220Bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-  function onOpen(event) {
-    console.log('Bağlantı başarılı!');
-    document.getElementById('state').innerHTML = "BAĞLANDI";
-    document.getElementById('state').className = "state status-ok";
-  }
+            <!-- Arıza Durumları -->
+            <div class="col-md-6 col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Arıza Durumları</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="arizaPaneli">
+                            <!-- Arıza LED'leri buraya eklenecek -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  function onClose(event) {
-    console.log('Bağlantı kesildi, tekrar deneniyor...');
-    document.getElementById('state').innerHTML = "Bağlantı Koptu";
-    document.getElementById('state').className = "state";
-    setTimeout(initWebSocket, 2000);
-  }
+        <!-- Kontrol Butonları -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Kontrol Butonları</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <button class="btn btn-primary control-btn" onclick="sendCommand('esp32/plc/write/M10', '1')">
+                            Test Başlat (M10)
+                        </button>
+                        <button class="btn btn-warning control-btn" onclick="sendCommand('esp32/plc/write/M18', '1')">
+                            Reset (M18)
+                        </button>
+                        <button class="btn btn-success control-btn" onclick="sendCommand('esp32/plc/write/M100', '1')">
+                            LED Test (M100)
+                        </button>
+                        <button class="btn btn-secondary control-btn" onclick="sendCommand('esp32/plc/write/M100', '0')">
+                            LED Kapat (M100)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  function onError(event) {
-    console.error('WebSocket Hatası (Muhtemelen HTTPS engeli):', event);
-  }
+        <!-- D220 Grafiği -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>D220 Akım Grafiği</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="d220Chart" width="400" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  function onMessage(event) {
-    var state;
-    if (event.data == "1"){ state = "AÇIK"; }
-    else if (event.data == "0"){ state = "KAPALI"; }
-    else { state = event.data; }
-    document.getElementById('state').innerHTML = state;
-  }
+    <script>
+        // MQTT Bağlantısı
+        const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+        const arizaSayisi = 13;
+        const arizaBaslangic = 201;
+        
+        // Veri depolama
+        const d220History = [];
+        const maxHistory = 20;
+        
+        // Chart.js grafiği
+        let d220Chart;
 
-  function onLoad(event) {
-    initWebSocket();
-    document.getElementById('button').addEventListener('click', toggle);
-  }
+        // Arıza panelini oluştur
+        function createArizaPanel() {
+            const panel = document.getElementById('arizaPaneli');
+            console.log('Arıza paneli bulundu:', panel);
+            
+            for (let i = 0; i < arizaSayisi; i++) {
+                const arizaNo = arizaBaslangic + i;
+                const div = document.createElement('div');
+                div.className = 'col-6 col-md-4 col-lg-3 mb-2';
+                div.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <span class="status-led gray" id="ariza${arizaNo}"></span>
+                        <span>M${arizaNo} Arıza</span>
+                    </div>
+                `;
+                panel.appendChild(div);
+                console.log('LED oluşturuldu:', 'ariza' + arizaNo);
+            }
+        }
 
-  function toggle(){
-    if(websocket && websocket.readyState === WebSocket.OPEN) {
-      websocket.send('toggle');
-    } else {
-      alert('Hata: ESP32 ile bağlantı yok! Tarayıcı ayarlarından "Güvensiz İçeriğe" izin verin.');
-    }
-  }
-</script>
+        // Grafiği oluştur
+        function createChart() {
+            const ctx = document.getElementById('d220Chart').getContext('2d');
+            d220Chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'D220 Akım (mA)',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Akım (mA)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Zaman'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // MQTT Bağlantı olayları
+        client.on('connect', function() {
+            console.log('MQTT bağlantısı başarılı');
+            updateConnectionStatus(true);
+            
+            // Topic'lere abone ol
+            client.subscribe('esp32/plc/d220');
+            client.subscribe('esp32/plc/ariza/+');
+            
+            // Durum mesajı gönder
+            const statusMsg = {
+                status: 'muzaffer_automation_connected',
+                timestamp: new Date().toISOString()
+            };
+            client.publish('esp32/plc/status', JSON.stringify(statusMsg));
+        });
+
+        client.on('message', function(topic, message) {
+            const payload = message.toString();
+            console.log('Mesaj geldi:', topic, payload);
+            
+            if (topic === 'esp32/plc/d220') {
+                updateD220(payload);
+            } else if (topic.startsWith('esp32/plc/ariza/')) {
+                // Topic'ten ariza numarasını ayır
+                const topicParts = topic.split('/');
+                let arizaNo = topicParts[topicParts.length - 1]; // Son kısmı al
+                
+                // Eğer M ile başlıyorsa, M'yi kaldır
+                if (arizaNo.startsWith('M')) {
+                    arizaNo = arizaNo.substring(1); // İlk karakteri kaldır
+                }
+                
+                console.log('Arıza numarası ayırıldı:', arizaNo);
+                updateAriza(arizaNo, payload);
+            }
+        });
+
+        client.on('error', function(error) {
+            console.error('MQTT Hatası:', error);
+            updateConnectionStatus(false);
+        });
+
+        client.on('close', function() {
+            console.log('MQTT bağlantısı kapandı');
+            updateConnectionStatus(false);
+        });
+
+        // D220 değerini güncelle
+        function updateD220(value) {
+            const numValue = parseInt(value) || 0;
+            document.getElementById('d220Value').textContent = numValue + ' mA';
+            
+            // Progress bar güncelle
+            const percentage = Math.min((numValue / 5000) * 100, 100);
+            document.getElementById('d220Bar').style.width = percentage + '%';
+            
+            // Grafiği güncelle
+            const now = new Date().toLocaleTimeString();
+            d220History.push({ time: now, value: numValue });
+            
+            if (d220History.length > maxHistory) {
+                d220History.shift();
+            }
+            
+            updateChart();
+        }
+
+        // Arıza durumunu güncelle
+        function updateAriza(arizaNo, value) {
+            const led = document.getElementById('ariza' + arizaNo);
+            if (led) {
+                const isActive = value === '1' || value === 'true' || value === 1;
+                led.className = 'status-led ' + (isActive ? 'red' : 'green');
+                
+                // Debug
+                console.log('LED güncellendi:', 'ariza' + arizaNo, 'Değer:', value, 'Durum:', isActive ? 'Kırmızı' : 'Yeşil');
+            } else {
+                console.log('LED bulunamadı:', 'ariza' + arizaNo, 'Tüm LED IDleri kontrol ediliyor...');
+                
+                // Tüm LED ID'lerini kontrol et
+                for (let i = 201; i <= 213; i++) {
+                    const testLed = document.getElementById('ariza' + i);
+                    console.log('LED kontrol:', 'ariza' + i, testLed ? 'Bulundu' : 'Bulunamadı');
+                }
+            }
+        }
+
+        // Grafiği güncelle
+        function updateChart() {
+            if (!d220Chart) return;
+            
+            d220Chart.data.labels = d220History.map(item => item.time);
+            d220Chart.data.datasets[0].data = d220History.map(item => item.value);
+            d220Chart.update();
+        }
+
+        // Komut gönder
+        function sendCommand(topic, payload) {
+            console.log('Komut gönderiliyor:', topic, payload);
+            client.publish(topic, payload);
+            
+            // Buton geri bildirimi
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Gönderiliyor...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 1000);
+        }
+
+        // Bağlantı durumunu güncelle
+        function updateConnectionStatus(connected) {
+            const statusBadge = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('mqttStatus');
+            
+            if (connected) {
+                statusBadge.className = 'badge bg-success';
+                statusBadge.textContent = 'Bağlı';
+                statusText.textContent = 'Bağlandı';
+            } else {
+                statusBadge.className = 'badge bg-danger';
+                statusBadge.textContent = 'Bağlantı Yok';
+                statusText.textContent = 'Bağlantı Kesik';
+            }
+        }
+
+        // Bağlantı bilgilerini göster
+        function showConnectionInfo() {
+            const info = `
+MQTT Broker: broker.hivemq.com:8000
+Client ID: ${client.options.clientId || 'Otomatik'}
+Topic'ler:
+- esp32/plc/d220 (D220 akım değeri)
+- esp32/plc/ariza/+ (Arıza durumları)
+- esp32/plc/write/* (Kontrol komutları)
+
+Son Güncelleme: ${new Date().toLocaleString()}
+            `;
+            alert(info);
+        }
+
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            createArizaPanel();
+            createChart();
+        });
+    </script>
 </body>
 </html>
