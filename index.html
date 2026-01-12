@@ -138,7 +138,7 @@
 
     <script>
         // MQTT Bağlantısı
-        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+        const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
         const arizaSayisi = 13;
         const arizaBaslangic = 201;
         
@@ -338,7 +338,7 @@
         // Bağlantı bilgilerini göster
         function showConnectionInfo() {
             const info = `
-MQTT Broker: broker.hivemq.com:8884
+MQTT Broker: broker.hivemq.com:8000
 Client ID: ${client.options.clientId || 'Otomatik'}
 Topic'ler:
 - esp32/plc/d220 (D220 akım değeri)
